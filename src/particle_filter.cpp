@@ -40,22 +40,24 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   std::normal_distribution<double> dist_theta(theta, std[2]);
   
   for(int i = 0; i < num_particles; i++) {
-    struct Particle p;
+    Particle p;
     p.id = i;
     p.x = dist_x(gen);
     p.y = dist_y(gen);
     p.theta = dist_theta(gen);
-    p.weights = 1;
+    p.weight = 1.0;
     
     particles.push_back(p);
+    weights.push_back(p.weight);
   }
   
+  is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], 
                                 double velocity, double yaw_rate) {
   /**
-   * TODO: Add measurements to each particle and add random Gaussian noise.
+   * Add measurements to each particle and add random Gaussian noise.
    * NOTE: When adding noise you may find std::normal_distribution 
    *   and std::default_random_engine useful.
    *  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
@@ -63,14 +65,15 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    */
   std::default_random_engine gen;
   
-  for(std::vector<Particle>::iterator p = particles.begin(); p != particles.end(); ++p) {
+  for(std::vector<Particle>::iterator it = particles.begin(); it != particles.end(); ++it) {
+    Particle p = *it;
     double new_x = p.x + velocity / yaw_rate * (sin(p.theta + yaw_rate * delta_t) - sin(p.theta));
     double new_y = p.y + velocity / yaw_rate * (cos(p.theta) - cos(p.theta + yaw_rate * delta_t));
     double new_theta = p.theta + yaw_rate * delta_t;
     
-    std::normal_distribution<double> dist_x(new_x, std[0]);
-    std::normal_distribution<double> dist_y(new_y, std[1]);
-    std::normal_distribution<double> dist_theta(new_theta, std[2]);
+    std::normal_distribution<double> dist_x(new_x, std_pos[0]);
+    std::normal_distribution<double> dist_y(new_y, std_pos[1]);
+    std::normal_distribution<double> dist_theta(new_theta, std_pos[2]);
     
     p.x = dist_x(gen);
     p.y = dist_y(gen);
@@ -109,6 +112,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
 
+  
+  
 }
 
 void ParticleFilter::resample() {
