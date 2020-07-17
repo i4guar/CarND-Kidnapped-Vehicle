@@ -15,6 +15,8 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <limits>
+
 
 #include "helper_functions.h"
 
@@ -65,8 +67,8 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    */
   std::default_random_engine gen;
   
-  for(std::vector<Particle>::iterator it = particles.begin(); it != particles.end(); ++it) {
-    Particle p = *it;
+  for(int i = 0; i < particles.size(); i++) {
+    Particle p = particles[i];
     double new_x = p.x + velocity / yaw_rate * (sin(p.theta + yaw_rate * delta_t) - sin(p.theta));
     double new_y = p.y + velocity / yaw_rate * (cos(p.theta) - cos(p.theta + yaw_rate * delta_t));
     double new_theta = p.theta + yaw_rate * delta_t;
@@ -92,7 +94,47 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
    *   probably find it useful to implement this method and use it as a helper 
    *   during the updateWeights phase.
    */
-
+  
+  
+  for(int i = 0; i < particles.size(); i++) {
+    Particle p = particles[i];
+    vector<LandmarkObs> global_observations; // in world coordinates
+    
+    // transform to global observations
+    for(int j = 0; j < observations.size(); j++) {
+      LandmarkObs obs_local = observations[j];
+      LandmarkObs obs_global = LandmarkObs();
+      obs_global.x = p.x + (cos(p.theta) * obs_local.x) - (sin(p.theta) * obs_local.y);
+      obs_global.y = p.y + (sin(p.theta) * obs_local.x) + (cos(p.theta) * obs_local.y);
+      obs_global.id = obs_local.id;
+      global_observations.push_back(observation_global);
+    }
+    
+    vector<int> landmark_ids;
+    vector<double> sense_x;
+    vector<double> sense_y;
+    for(int i = 0; predicted.size(); i++) {
+      double min_dist = 10000000000;
+      LandmarkObs min_landmark;
+      LandmarkObs pred = predicted[i];
+      for(int j = 0; global_observations.size(); j++) {
+        LandmarkObs obs = global_observations[j];
+        double landmark_dist = dist(pred.x, pred.y, obs.x, obs.y);
+        if(landmark_dist < min_dist) {
+          min_dist = landmark_dist;
+          min_landmark = obs;
+        }
+      }
+      
+      landmark_ids.push_back(min_landmark.id);
+      sense_x.push_back(min_landmark.x);
+      sense_y.push_back(min_landmark.y);
+    }
+    
+    SetAssociations(p, landmark_ids, sense_x, sense_y);
+  
+  }
+  
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
@@ -111,8 +153,20 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   and the following is a good resource for the actual equation to implement
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
-
+  dataAssociation(map_landmarks, observations);
   
+  for(int i = 0; i < particles.size(); i++) {
+    Particle p = particles[i];
+    
+    // map_landmarks are the predicted position where the global observation should be
+  
+      // Predicted landmark measurements for each particle
+  // data association
+  // mulit var
+  
+  // normalize weights 0 to 1 
+      
+  }
   
 }
 
