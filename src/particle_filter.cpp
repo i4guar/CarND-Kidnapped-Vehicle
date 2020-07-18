@@ -85,7 +85,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
 }
 
 void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted, 
-                                     vector<LandmarkObs>& observations) {
+                                     vector<LandmarkObs> observations) {
   /**
    * TODO: Find the predicted measurement that is closest to each 
    *   observed measurement and assign the observed measurement to this 
@@ -107,7 +107,7 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
       obs_global.x = p.x + (cos(p.theta) * obs_local.x) - (sin(p.theta) * obs_local.y);
       obs_global.y = p.y + (sin(p.theta) * obs_local.x) + (cos(p.theta) * obs_local.y);
       obs_global.id = obs_local.id;
-      global_observations.push_back(observation_global);
+      global_observations.push_back(obs_global);
     }
     
     vector<int> landmark_ids;
@@ -127,8 +127,8 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
       }
       
       landmark_ids.push_back(min_landmark.id);
-      sense_x.push_back(min_landmark.x);
-      sense_y.push_back(min_landmark.y);
+      sense_x.push_back(min_landmark.x); // pred.x?
+      sense_y.push_back(min_landmark.y); // pred.y?
     }
     
     SetAssociations(p, landmark_ids, sense_x, sense_y);
@@ -153,19 +153,43 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   and the following is a good resource for the actual equation to implement
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
-  dataAssociation(map_landmarks, observations);
+  
+  vector<LandmarkObs> map_landmark_obs;
+  
+  for (int i = 0; i < map_landmarks.landmark_list.size(); i++) {
+    LandmarkObs l = LandmarkObs();
+    l.id = map_landmarks.landmark_list[i].id_i;
+    l.x = map_landmarks.landmark_list[i].x_f;
+    l.y = map_landmarks.landmark_list[i].y_f;
+    map_landmark_obs.push_back(l);
+  }
+  
+  dataAssociation(map_landmark_obs, observations);
   
   for(int i = 0; i < particles.size(); i++) {
     Particle p = particles[i];
     
-    // map_landmarks are the predicted position where the global observation should be
-  
-      // Predicted landmark measurements for each particle
-  // data association
-  // mulit var
-  
-  // normalize weights 0 to 1 
+    for (int j = 0; j < p.associations.size(); j++) {
+      int landmark_id = p.associations[j];
+      LandmarkObs landmark;
+      // get landmark with id equals landmark_id
+      for (int k = 0; k < map_landmark_obs.size(); k++) {
+        if(map_landmark_obs[k].id == landmark_id) {
+          landmark = map_landmark_obs[k];
+        }
+      }
       
+      // mulit var
+      p.weight *= multiv_prob(std_landmark[0], std_landmark[1], p.sense_x[j], p.sense_y[j], landmark.x, landmark.y);
+      weights[i] = p.weight;
+    }
+  }
+  // normalize weights
+  double sum_of_weights = std::accumulate(weights.begin(), weights.end(), 0);
+  
+  for (int i = 0; i < weights.size(); i++) {
+    weights[i] /= sum_of_weights;
+    particles[i].weight = weights[i];
   }
   
 }
@@ -192,6 +216,25 @@ void ParticleFilter::SetAssociations(Particle& particle,
   particle.associations= associations;
   particle.sense_x = sense_x;
   particle.sense_y = sense_y;
+}
+
+// from udacity classroom
+double multiv_prob(double sig_x, double sig_y, double x_obs, double y_obs,
+                   double mu_x, double mu_y) {
+  // calculate normalization term
+  double gauss_norm;
+  gauss_norm = 1 / (2 * M_PI * sig_x * sig_y);
+
+  // calculate exponent
+  double exponent;
+  exponent = (pow(x_obs - mu_x, 2) / (2 * pow(sig_x, 2)))
+               + (pow(y_obs - mu_y, 2) / (2 * pow(sig_y, 2)));
+    
+  // calculate weight using normalization terms and exponent
+  double weight;
+  weight = gauss_norm * exp(-exponent);
+    
+  return weight;
 }
 
 string ParticleFilter::getAssociations(Particle best) {

@@ -21,6 +21,8 @@
 const double M_PI = 3.14159265358979323846;
 #endif
 
+double multiv_prob(double sig_x, double sig_y, double x_obs, double y_obs, double mu_x, double mu_y);
+
 /**
  * Struct representing one position/control measurement.
  */
