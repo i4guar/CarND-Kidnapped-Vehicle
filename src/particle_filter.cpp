@@ -41,7 +41,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   std::normal_distribution<double> dist_y(y, std[1]);
   std::normal_distribution<double> dist_theta(theta, std[2]);
   
-  for(int i = 0; i < num_particles; i++) {
+  for (int i = 0; i < num_particles; i++) {
     Particle p;
     p.id = i;
     p.x = dist_x(gen);
@@ -67,7 +67,8 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    */
   std::default_random_engine gen;
   
-  for(int i = 0; i < num_particles; i++) {
+  
+  for (int i = 0; i < num_particles; i++) {
     if (fabs(yaw_rate) >= 0.00001) {
       particles[i].x += velocity / yaw_rate * (sin(particles[i].theta + yaw_rate * delta_t) - sin(particles[i].theta));
       particles[i].y += velocity / yaw_rate * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate * delta_t));
@@ -99,19 +100,19 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
    */
   
  
-    for(unsigned int i = 0; observations.size(); i++) {
+    for (unsigned int i = 0; i < observations.size(); i++) {
       double min_dist = std::numeric_limits<double>::max();
       LandmarkObs min_landmark;
       LandmarkObs obs = observations[i];
-      for(unsigned int j = 0; predicted.size(); j++) {
+      for (unsigned int j = 0; j < predicted.size(); j++) {
         LandmarkObs pred = predicted[j];
         double landmark_dist = dist(obs.x, obs.y, pred.x, pred.y);
         if(landmark_dist < min_dist) {
           min_dist = landmark_dist;
           min_landmark = pred;
         }
-        observations[i].id = min_landmark.id;
       }
+      observations[i].id = min_landmark.id;
     }
   
 }
@@ -132,7 +133,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   and the following is a good resource for the actual equation to implement
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
-  for(int i = 0; i < num_particles; i++) {
+  for (int i = 0; i < num_particles; i++) {
     Particle p = particles[i];
     vector<LandmarkObs> map_landmark_obs;
 
@@ -148,7 +149,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   
     vector<LandmarkObs> obs_world;
     // transform observations to world coordinates  
-    for(unsigned int j = 0; j < observations.size(); j++) {
+    for (unsigned int j = 0; j < observations.size(); j++) {
       LandmarkObs obs_local = observations[j];
       LandmarkObs obs_global = LandmarkObs();
       obs_global.x = p.x + (cos(p.theta) * obs_local.x) - (sin(p.theta) * obs_local.y);
