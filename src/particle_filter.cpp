@@ -50,7 +50,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
     p.weight = 1.0;
     
     particles.push_back(p);
-    //weights.push_back(p.weight);
+    weights.push_back(p.weight);
   }
   
   is_initialized = true;
@@ -68,10 +68,14 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
   std::default_random_engine gen;
   
   for(int i = 0; i < num_particles; i++) {
-    particles[i].x += velocity / yaw_rate * (sin(particles[i].theta + yaw_rate * delta_t) - sin(particles[i].theta));
-    particles[i].y += velocity / yaw_rate * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate * delta_t));
-    particles[i].theta += yaw_rate * delta_t;
-    
+    if (fabs(yaw_rate) >= 0.00001) {
+      particles[i].x += velocity / yaw_rate * (sin(particles[i].theta + yaw_rate * delta_t) - sin(particles[i].theta));
+      particles[i].y += velocity / yaw_rate * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate * delta_t));
+      particles[i].theta += yaw_rate * delta_t;
+    } else {
+      particles[i].x += velocity * cos(particles[i].theta) * delta_t;
+      particles[i].y += velocity * sin(particles[i].theta) * delta_t;
+    }
     std::normal_distribution<double> dist_x(particles[i].x, std_pos[0]);
     std::normal_distribution<double> dist_y(particles[i].y, std_pos[1]);
     std::normal_distribution<double> dist_theta(particles[i].theta, std_pos[2]);
