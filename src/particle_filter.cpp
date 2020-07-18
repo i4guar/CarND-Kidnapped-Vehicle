@@ -23,6 +23,8 @@
 using std::string;
 using std::vector;
 
+std::default_random_engine gen;
+
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
   /**
    * Set the number of particles. Initialize all particles to 
@@ -33,8 +35,6 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    *   (and others in this file).
    */
   
-  std::default_random_engine gen;
-
   num_particles = 100;  // Set the number of particles
   
   std::normal_distribution<double> dist_x(x, std[0]);
@@ -64,9 +64,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    *   and std::default_random_engine useful.
    *  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
    *  http://www.cplusplus.com/reference/random/default_random_engine/
-   */
-  std::default_random_engine gen;
-  
+   */  
   
   for (int i = 0; i < num_particles; i++) {
     if (fabs(yaw_rate) >= 0.00001) {
@@ -134,7 +132,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
   for (int i = 0; i < num_particles; i++) {
-    Particle p = particles[i];
     vector<LandmarkObs> map_landmark_obs;
 
     for (unsigned int j = 0; j < map_landmarks.landmark_list.size(); j++) {
@@ -142,7 +139,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       l.id = map_landmarks.landmark_list[j].id_i;
       l.x = map_landmarks.landmark_list[j].x_f;
       l.y = map_landmarks.landmark_list[j].y_f;
-      if(dist(p.x, p.y, l.x, l.y) <= sensor_range) {
+      if(dist(particles[i].x, particles[i].y, l.x, l.y) <= sensor_range) {
         map_landmark_obs.push_back(l); 
       }
     }
@@ -152,34 +149,36 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     for (unsigned int j = 0; j < observations.size(); j++) {
       LandmarkObs obs_local = observations[j];
       LandmarkObs obs_global = LandmarkObs();
-      obs_global.x = p.x + (cos(p.theta) * obs_local.x) - (sin(p.theta) * obs_local.y);
-      obs_global.y = p.y + (sin(p.theta) * obs_local.x) + (cos(p.theta) * obs_local.y);
+      obs_global.x = particles[i].x + (cos(particles[i].theta) * obs_local.x) - (sin(particles[i].theta) * obs_local.y);
+      obs_global.y = particles[i].y + (sin(particles[i].theta) * obs_local.x) + (cos(particles[i].theta) * obs_local.y);
       obs_world.push_back(obs_global);
     }
     
     dataAssociation(map_landmark_obs, obs_world);
+    // reset weight
+    particles[i].weight = 1.0;
     
     for (unsigned int j = 0; j < obs_world.size(); j++) {
       int landmark_id = obs_world[j].id;
       LandmarkObs landmark;
+      landmark.id = -1;
+     
       // get landmark with id equals landmark_id
       for (unsigned int k = 0; k < map_landmark_obs.size(); k++) {
         if(map_landmark_obs[k].id == landmark_id) {
           landmark = map_landmark_obs[k];
+          break;
         }
       }
-      
+     
+      if (landmark.id == -1) {
+        continue;
+      }
       // mulit var
-      p.weight *= multiv_prob(std_landmark[0], std_landmark[1], obs_world[j].x, obs_world[j].y, landmark.x, landmark.y);
-      weights[i] = p.weight;
+      double w = multiv_prob(std_landmark[0], std_landmark[1], obs_world[j].x, obs_world[j].y, landmark.x, landmark.y);
+      particles[i].weight *= w;
+      weights[i] = particles[i].weight;
     }
-  }
-  // normalize weights
-  double sum_of_weights = std::accumulate(weights.begin(), weights.end(), 0);
-  
-  for (int i = 0; i < num_particles; i++) {
-    weights[i] /= sum_of_weights;
-    particles[i].weight = weights[i];
   }
   
 }
@@ -193,12 +192,12 @@ void ParticleFilter::resample() {
    */
   
   std::random_device rd;
-  std::mt19937 gen(rd());
+  std::mt19937 gen_i(rd());
   
   std::discrete_distribution<> d(weights.begin(), weights.end());
   vector<Particle> resampled_particles;
   for (int i = 0; i < num_particles; i++) {
-    resampled_particles.push_back(particles[d(gen)]);
+    resampled_particles.push_back(particles[d(gen_i)]);
   }
   particles = resampled_particles;
   
