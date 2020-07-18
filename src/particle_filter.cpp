@@ -88,7 +88,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
 }
 
 void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted, 
-                                     vector<LandmarkObs> observations) {
+                                     vector<LandmarkObs> &observations) {
   /**
    * TODO: Find the predicted measurement that is closest to each 
    *   observed measurement and assign the observed measurement to this 
@@ -98,45 +98,21 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
    *   during the updateWeights phase.
    */
   
-  
-  for(int i = 0; i < num_particles; i++) {
-    Particle p = particles[i];
-    vector<LandmarkObs> global_observations; // in world coordinates
-    
-    // transform to global observations
-    for(unsigned int j = 0; j < observations.size(); j++) {
-      LandmarkObs obs_local = observations[j];
-      LandmarkObs obs_global = LandmarkObs();
-      obs_global.x = p.x + (cos(p.theta) * obs_local.x) - (sin(p.theta) * obs_local.y);
-      obs_global.y = p.y + (sin(p.theta) * obs_local.x) + (cos(p.theta) * obs_local.y);
-      obs_global.id = obs_local.id;
-      global_observations.push_back(obs_global);
-    }
-    
-    vector<int> landmark_ids;
-    vector<double> sense_x;
-    vector<double> sense_y;
-    for(unsigned int i = 0; predicted.size(); i++) {
-      double min_dist = 10000000000;
+ 
+    for(unsigned int i = 0; observations.size(); i++) {
+      double min_dist = std::numeric_limits<double>::max();
       LandmarkObs min_landmark;
-      LandmarkObs pred = predicted[i];
-      for(int j = 0; global_observations.size(); j++) {
-        LandmarkObs obs = global_observations[j];
-        double landmark_dist = dist(pred.x, pred.y, obs.x, obs.y);
+      LandmarkObs obs = observations[i];
+      for(unsigned int j = 0; predicted.size(); j++) {
+        LandmarkObs pred = predicted[j];
+        double landmark_dist = dist(obs.x, obs.y, pred.x, pred.y);
         if(landmark_dist < min_dist) {
           min_dist = landmark_dist;
-          min_landmark = obs;
+          min_landmark = pred;
         }
+        observations[i].id = min_landmark.id;
       }
-      
-      landmark_ids.push_back(min_landmark.id);
-      sense_x.push_back(min_landmark.x); // pred.x?
-      sense_y.push_back(min_landmark.y); // pred.y?
     }
-    
-    SetAssociations(p, landmark_ids, sense_x, sense_y);
-  
-  }
   
 }
 
@@ -156,24 +132,34 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   and the following is a good resource for the actual equation to implement
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
-  
-  vector<LandmarkObs> map_landmark_obs;
-  
-  for (unsigned int i = 0; i < map_landmarks.landmark_list.size(); i++) {
-    LandmarkObs l = LandmarkObs();
-    l.id = map_landmarks.landmark_list[i].id_i;
-    l.x = map_landmarks.landmark_list[i].x_f;
-    l.y = map_landmarks.landmark_list[i].y_f;
-    map_landmark_obs.push_back(l);
-  }
-  
-  dataAssociation(map_landmark_obs, observations);
-  
-  for(unsigned int i = 0; i < particles.size(); i++) {
+  for(int i = 0; i < num_particles; i++) {
     Particle p = particles[i];
+    vector<LandmarkObs> map_landmark_obs;
+
+    for (unsigned int j = 0; j < map_landmarks.landmark_list.size(); j++) {
+      LandmarkObs l = LandmarkObs();
+      l.id = map_landmarks.landmark_list[j].id_i;
+      l.x = map_landmarks.landmark_list[j].x_f;
+      l.y = map_landmarks.landmark_list[j].y_f;
+      if(dist(p.x, p.y, l.x, l.y) <= sensor_range) {
+        map_landmark_obs.push_back(l); 
+      }
+    }
+  
+    vector<LandmarkObs> obs_world;
+    // transform observations to world coordinates  
+    for(unsigned int j = 0; j < observations.size(); j++) {
+      LandmarkObs obs_local = observations[j];
+      LandmarkObs obs_global = LandmarkObs();
+      obs_global.x = p.x + (cos(p.theta) * obs_local.x) - (sin(p.theta) * obs_local.y);
+      obs_global.y = p.y + (sin(p.theta) * obs_local.x) + (cos(p.theta) * obs_local.y);
+      obs_world.push_back(obs_global);
+    }
     
-    for (unsigned int j = 0; j < p.associations.size(); j++) {
-      int landmark_id = p.associations[j];
+    dataAssociation(map_landmark_obs, obs_world);
+    
+    for (unsigned int j = 0; j < obs_world.size(); j++) {
+      int landmark_id = obs_world[j].id;
       LandmarkObs landmark;
       // get landmark with id equals landmark_id
       for (unsigned int k = 0; k < map_landmark_obs.size(); k++) {
@@ -183,14 +169,14 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       }
       
       // mulit var
-      p.weight *= multiv_prob(std_landmark[0], std_landmark[1], p.sense_x[j], p.sense_y[j], landmark.x, landmark.y);
+      p.weight *= multiv_prob(std_landmark[0], std_landmark[1], obs_world[j].x, obs_world[j].y, landmark.x, landmark.y);
       weights[i] = p.weight;
     }
   }
   // normalize weights
   double sum_of_weights = std::accumulate(weights.begin(), weights.end(), 0);
   
-  for (unsigned int i = 0; i < weights.size(); i++) {
+  for (int i = 0; i < num_particles; i++) {
     weights[i] /= sum_of_weights;
     particles[i].weight = weights[i];
   }
